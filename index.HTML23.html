@@ -1,0 +1,561 @@
+
+
+Here is the complete HTML document, ready to be copied and pasted directly into a file (e.g., `index.html`) in your VS Code environment.
+
+This code includes the UI, Tailwind CSS classes, the `html2pdf.js` library, and the updated JavaScript logic that calculates the grade and adds the corresponding **Teacher's Comment/Remark** to the PDF output.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive School Result Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1rem;
+            background: white;
+            min-height: 100vh;
+            box-shadow: none;
+        }
+        @media (min-width: 640px) {
+            .container {
+                padding: 2rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                margin: 2rem auto;
+                min-height: auto;
+            }
+        }
+        /* Styles for the marksheet template */
+        .marksheet {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        .marksheet th, .marksheet td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .marksheet th {
+            background-color: #eef2ff;
+            font-weight: 600;
+        }
+        .title {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+        /* Mobile optimization for input rows */
+        .input-row {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding: 12px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .input-row label {
+            width: 100%;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 6px;
+        }
+        .input-row input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 1rem;
+        }
+        /* Desktop alignment */
+        @media (min-width: 640px) {
+             .input-row {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 12px;
+            }
+            .input-row label {
+                width: 60%;
+                margin-bottom: 0;
+            }
+            .input-row input[type="number"] {
+                width: 120px;
+                text-align: center;
+            }
+        }
+        /* Styles applied to each marksheet before converting to PDF */
+        .pdf-page {
+            padding: 20px;
+            box-sizing: border-box;
+            background: white;
+            min-height: 1000px;
+            page-break-after: always; 
+        }
+        .pdf-page:last-child {
+            page-break-after: avoid; 
+        }
+        /* Added styling for the UI footer */
+        .app-footer {
+            text-align: center;
+            padding-top: 10px;
+            font-size: 1rem;
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="text-3xl font-bold text-center text-indigo-700 mb-2">Result Entry Dashboard</h1>
+    <p class="text-center text-gray-500 mb-6 text-sm">Input student records sequentially to generate a combined PDF.</p>
+
+    <div class="p-3 bg-indigo-600 rounded-xl mb-6 shadow-xl">
+        <div class="flex justify-between items-center text-white">
+            <span class="text-xl font-bold" id="studentCounter">0 Students Added</span>
+            <button onclick="generateCombinedPdf()" id="generatePdfButton" disabled
+                class="bg-green-400 hover:bg-green-300 text-indigo-900 font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 focus:outline-none focus:ring-4 focus:ring-green-300 focus:ring-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                Generate Combined PDF (0)
+            </button>
+        </div>
+    </div>
+
+    <form id="marksEntryForm" onsubmit="event.preventDefault(); addStudentAndReset();" class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Student Details</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="studentName" class="block text-sm font-semibold text-gray-700">Student Name</label>
+                <input type="text" id="studentName" required class="mt-1 w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label for="studentStd" class="block text-sm font-semibold text-gray-700">Class & Section</label>
+                <input type="text" id="studentStd" required class="mt-1 w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2 mt-6">Marks Entry (Out of 100 or 40)</h2>
+
+        <div id="marksInputContainer" class="space-y-3">
+            </div>
+
+        <button type="submit" id="addStudentButton"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-xl transition duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 mt-8">
+            Add Student & Next
+        </button>
+    </form>
+      <h1 class="text-3xl font-bold text-center text-indigo-700 mb-2">Developed by Amaan</h1>
+    <div class="app-footer">
+    </div>
+
+    <div id="loadingMessage" class="hidden text-center text-indigo-700 font-bold mt-8 text-xl p-4 bg-indigo-100 rounded-lg shadow-md border border-indigo-300">
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-700 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Generating combined PDF... Please wait, this may take a moment for many students.
+    </div>
+
+    <div id="resultsContainer" class="hidden">
+        </div>
+
+    <div id="errorModal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center p-4 z-50 transition-opacity">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-transform scale-100">
+            <h3 class="text-xl font-bold text-red-600 mb-4 border-b pb-2">Input Error</h3>
+            <p id="errorText" class="text-gray-700 mb-6 text-base">Please ensure all required fields are filled and marks are valid numbers.</p>
+            <button onclick="document.getElementById('errorModal').classList.add('hidden'); document.getElementById('errorModal').classList.remove('flex');" 
+                        class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold">
+                Dismiss
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Configuration ---
+    const SCHOOL_NAME = "OXFORD ENGLISH HIGH SCHOOL";
+    const EXAM_TERM = "I Term Exam";
+    const ACADEMIC_YEAR = "2024-2025";
+    
+    const SUBJECTS = [
+        { name: "English", max: 100, min: 35, id: "english" },
+        { name: "Hindi / Sanskrit", max: 100, min: 35, id: "hindi" },
+        { name: "Marathi", max: 100, min: 35, id: "marathi" },
+        { name: "Maths", max: 100, min: 35, id: "maths" },
+        { name: "G. Science", max: 100, min: 35, id: "gscience" },
+        { name: "Social Studies", max: 100, min: 35, id: "socialstudies" },
+        { name: "Drawing", max: 100, min: 35, id: "drawing" },
+        { name: "Work Experience", max: 100, min: 35, id: "workexperience" },
+        { name: "P.T.", max: 100, min: 35, id: "pt" },
+        { name: "Computer", max: 40, min: 14, id: "computer" }
+    ];
+
+    const TOTAL_MAX_GRAND_900 = 900;
+    const TOTAL_MIN_GRAND_315 = 315; 
+    
+    // Global array to store all saved student records
+    let studentsData = [];
+
+    // --- Initialization ---
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderMarksInputFields();
+        updateCounterAndButton();
+    });
+
+    /**
+     * Renders the subject mark input fields into the form.
+     */
+    function renderMarksInputFields() {
+        const container = document.getElementById('marksInputContainer');
+        container.innerHTML = SUBJECTS.map(subject => `
+            <div class="input-row">
+                <label for="${subject.id}">${subject.name}</label>
+                <input type="number" id="${subject.id}" name="${subject.id}" min="0" max="${subject.max}" required class="mark-input" placeholder="Min: ${subject.min} / Max: ${subject.max}">
+            </div>
+        `).join('');
+    }
+
+    /**
+     * Displays a custom modal error message.
+     */
+    function showError(message) {
+        document.getElementById('errorText').textContent = message;
+        document.getElementById('errorModal').classList.remove('hidden');
+        document.getElementById('errorModal').classList.add('flex');
+    }
+
+    /**
+     * Calculates marks, percentage, and pass/fail status for a single student.
+     */
+    function calculateResults(marksArray) {
+        let totalObtained9 = 0;
+        let passedAllMajor = true;
+
+        // Process the first 9 subjects (out of 100 each)
+        SUBJECTS.slice(0, 9).forEach((sub, index) => {
+            const mark = marksArray[index];
+            if (!isNaN(mark) && mark !== null) { 
+                totalObtained9 += mark;
+                if (mark < sub.min) {
+                    passedAllMajor = false;
+                }
+            } else {
+                passedAllMajor = false; 
+            }
+        });
+
+        // Process Computer (subject 10, index 9)
+        const computerMark = marksArray[9];
+        const computerPassed = !isNaN(computerMark) && computerMark !== null ? computerMark >= SUBJECTS[9].min : false;
+
+        // Calculate the percentage based on the 9 major subjects (max 900)
+        let percentage = (totalObtained9 / TOTAL_MAX_GRAND_900) * 100;
+        percentage = isNaN(percentage) ? 0 : parseFloat(percentage.toFixed(2));
+
+        // Check overall passing status
+        let finalOverallRemark = "PASS";
+        if (!passedAllMajor || !computerPassed) {
+             finalOverallRemark = "FAIL";
+        }
+        
+        // Use the updated function to get both grade and textual remark
+        const { grade, remark } = getGradeAndRemark(percentage, finalOverallRemark);
+
+        return {
+            totalObtained: totalObtained9,
+            percentage,
+            grade,
+            finalOverallRemark,
+            studentRemark: remark // Store the new textual remark
+        };
+    }
+
+    /**
+     * Assigns a letter grade and a textual remark based on percentage and pass/fail status.
+     */
+    function getGradeAndRemark(percentage, finalOverallRemark) {
+        let grade = "";
+        let remark = "";
+
+        if (finalOverallRemark === "FAIL") {
+             grade = "E (FAIL)";
+             remark = "Needs Significant Improvement. Review all subjects.";
+        } else if (percentage >= 90) {
+            grade = "A+";
+            remark = "Excellent Performance! Keep up the great work.";
+        } else if (percentage >= 80) {
+            grade = "A";
+            remark = "Outstanding Results! A truly commendable effort.";
+        } else if (percentage >= 70) {
+            grade = "B+";
+            remark = "Very Good. Solid performance, focus on minor weak areas.";
+        } else if (percentage >= 60) {
+            grade = "B";
+            remark = "Good. Satisfactory achievement, strive for higher grades.";
+        } else if (percentage >= 50) {
+            grade = "C";
+            remark = "Fair. Passed, but dedicated study is advised for the next term.";
+        } else if (percentage >= 35) {
+            grade = "D";
+            remark = "Basic Pass. Must work harder to achieve a better standing.";
+        } else {
+            // Should be caught by the finalOverallRemark check, but added for completeness
+            grade = "E (FAIL)";
+            remark = "Needs Significant Improvement. Review all subjects.";
+        }
+        
+        return { grade, remark };
+    }
+
+    /**
+     * Collects data from the form, validates it, saves the student record, and resets the form.
+     */
+    function addStudentAndReset() {
+        const name = document.getElementById('studentName').value.trim();
+        const std = document.getElementById('studentStd').value.trim();
+        
+        if (!name || !std) {
+            showError("Please enter the student's **Name** and **Class/Section**.");
+            return;
+        }
+
+        const marks = [];
+        let allMarksValid = true;
+
+        SUBJECTS.forEach(sub => {
+            const inputElement = document.getElementById(sub.id);
+            const mark = parseInt(inputElement.value);
+            
+            // Check if mark is NaN OR outside valid bounds
+            if (isNaN(mark) || mark < 0 || mark > sub.max) {
+                allMarksValid = false;
+            }
+            marks.push(mark);
+        });
+
+        if (!allMarksValid) {
+            showError("Please ensure all **Marks** are entered as valid numbers and are within the correct range (0 to Max Marks).");
+            return;
+        }
+
+        const calculated = calculateResults(marks);
+
+        const newStudent = {
+            name,
+            std,
+            marks, // Array of 10 integer marks
+            calculated // The pre-calculated summary object
+        };
+
+        studentsData.push(newStudent);
+        
+        // Reset the form for the next student
+        document.getElementById('marksEntryForm').reset();
+        
+        // Update the UI counter and button state
+        updateCounterAndButton();
+        
+        // Clear name and std for next student, keeping focus for quick entry
+        document.getElementById('studentName').focus();
+    }
+
+    /**
+     * Updates the counter display and enables/disables the PDF button.
+     */
+    function updateCounterAndButton() {
+        const count = studentsData.length;
+        document.getElementById('studentCounter').textContent = `${count} Students Added`;
+        
+        const generateButton = document.getElementById('generatePdfButton');
+        generateButton.textContent = `Generate Combined PDF (${count})`;
+        generateButton.disabled = count === 0;
+    }
+
+    /**
+     * Generates the HTML for a single student's marksheet.
+     */
+    function createMarksheetHTML(student) {
+        const { name, std, marks, calculated } = student;
+
+        /**
+         * Determines the simple remark (PASS/FAIL) for a subject.
+         */
+        const getSubjectRemark = (marks, minMarks) => {
+            return marks >= minMarks ? "PASS" : "FAIL";
+        };
+
+        // Subject rows generation (First 9 subjects for the main table)
+        const subjectRows = SUBJECTS.slice(0, 9).map((sub, index) => {
+            const obtained = marks[index];
+            const remark = getSubjectRemark(obtained, sub.min);
+            return `
+                <tr>
+                    <td>${sub.name}</td>
+                    <td>${sub.min} / ${sub.max}</td>
+                    <td>${obtained}</td>
+                    <td>${remark}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Computer row (subject 10, index 9)
+        const computerMark = marks[9];
+        const computerRemark = getSubjectRemark(computerMark, SUBJECTS[9].min);
+
+        return `
+            <div class="pdf-page w-full mx-auto" style="min-height: 1000px;">
+                <div class="title">${SCHOOL_NAME}</div>
+                <div class="subtitle">Marksheet for ${EXAM_TERM}</div>
+                <div class="subtitle text-sm mt-[-10px] mb-4">${ACADEMIC_YEAR}</div>
+
+                <table class="marksheet" style="border: none !important;">
+                    <tr class="no-border">
+                        <td style="width: 50%; border: none !important; padding-left: 0;"><strong>Name:</strong> ${name}</td>
+                        <td style="width: 50%; border: none !important; text-align: right; padding-right: 0;"><strong>Std:</strong> ${std}</td>
+                    </tr>
+                </table>
+
+                <table class="marksheet" style="margin-top: 10px;">
+                    <colgroup>
+                        <col style="width: 40%;">
+                        <col style="width: 20%;">
+                        <col style="width: 20%;">
+                        <col style="width: 20%;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Min / Max</th>
+                            <th>Obtained Marks</th>
+                            <th>Remark</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${subjectRows}
+                        
+                        <tr>
+                            <td><strong>Total</strong></td>
+                            <td>${TOTAL_MIN_GRAND_315} / 900</td>
+                            <td><strong>${calculated.totalObtained}</strong></td>
+                            <td></td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Percentage / Grade</strong></td>
+                            <td></td>
+                            <td><strong>${calculated.percentage}%</strong></td>
+                            <td><strong>${calculated.grade}</strong></td>
+                        </tr>
+
+                        <tr>
+                            <td>Computer</td>
+                            <td>${SUBJECTS[9].min} / ${SUBJECTS[9].max}</td>
+                            <td>${computerMark}</td>
+                            <td>${computerRemark}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 25px; font-size: 14px; text-align: right;">
+                    <strong>Overall Result:</strong> <span style="font-weight: 700; color: ${calculated.finalOverallRemark === 'PASS' ? 'green' : 'red'};">${calculated.finalOverallRemark}</span>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f7f7f7; font-size: 14px; font-weight: 600;">
+                    Teacher's Comment: <span style="font-weight: 500; color: #1f2937;">${calculated.studentRemark}</span>
+                </div>
+                <div style="margin-top: 50px; display: flex; justify-content: space-between; font-size: 14px;">
+                    <div style="width: 30%;">
+                        Class teacher's Sign: <span style="display: block; border-bottom: 1px solid #000; margin-top: 15px;"></span>
+                    </div>
+                    <div style="width: 30%;">
+                        H.M. Sign: <span style="display: block; border-bottom: 1px solid #000; margin-top: 15px;"></span>
+                    </div>
+                    <div style="width: 30%;">
+                        Parent's Sign: <span style="display: block; border-bottom: 1px solid #000; margin-top: 15px;"></span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Main function to combine all saved marksheets and generate the PDF.
+     */
+    async function generateCombinedPdf() {
+        if (studentsData.length === 0) {
+            showError("Please add at least one student before generating the PDF.");
+            return;
+        }
+
+        const resultsContainer = document.getElementById('resultsContainer');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const generateButton = document.getElementById('generatePdfButton');
+
+        // 1. Show Loading and Disable Button
+        generateButton.disabled = true;
+        loadingMessage.classList.remove('hidden');
+        resultsContainer.classList.remove('hidden');
+        
+        // Give the browser time to render the loading message
+        await new Promise(resolve => setTimeout(resolve, 50)); 
+        
+        // 2. Combine all marksheets HTML
+        const combinedHTML = studentsData.map(student => createMarksheetHTML(student)).join('');
+        resultsContainer.innerHTML = combinedHTML;
+
+        // 3. Generate PDF
+        const element = resultsContainer;
+        const filename = `${SCHOOL_NAME}_${EXAM_TERM}_${ACADEMIC_YEAR}_Combined_Results.pdf`;
+
+        const options = {
+            margin: 10,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, logging: false, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            await html2pdf().from(element).set(options).save();
+        } catch (error) {
+            console.error("PDF generation failed:", error);
+            showError("An error occurred during PDF generation. Check the console for details.");
+        } finally {
+            // 4. Clean up and Enable Button
+            resultsContainer.innerHTML = '';
+            resultsContainer.classList.add('hidden');
+            loadingMessage.classList.add('hidden');
+            generateButton.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
+```
